@@ -1,0 +1,228 @@
+    - Numeric literal capture expression:
+
+^(?<sign>[+-])?(?:0b(?<bin>[01]+)|0x(?<hex>[0-9a-f]+)|(?<dec>(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?))(?<type>u?y|u?s|u?l|u|n|d)?(?<multiplier>kb|mb|gb|tb|pb)?$
+
+
+    - Condensed (no names, removed unnecessary capture groups)
+
+^[+-]?(?:0b([01]+)|0x([0-9a-f]+)|((?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?))(u?y|u?s|u?l|u|n|d)?(kb|mb|gb|tb|pb)?$
+
+
+    - This regex matches any and all numeric literal values (in PSv7.1), including:
+
+        + Binary literals prefixed with '0b'.
+        + Hexadecimal literals prefixed with '0x'.
+        + Decimal literals written in 'ipart.fpart' form.
+        + Decimal literals written in scientific notation.
+        + All of the above, while capturing all valid type and multiplier suffixes.
+        + Tolerates slight malformation, such as redundant sign or nothing after the decimal point.
+
+        * See msdn:about_numeric_literals.
+
+
+    - Conceptual overview:
+
+        ^                                                    Start capture at beginning of string.
+        (?<sign>[+-])?                                       Capture the sign if found.
+        (?:                                                  Capture one of the following options:
+          0b(?<bin>[01]+)                                    Binary literal prefixed with '0b'
+          |                                                  or
+          0x(?<hex>[0-9a-f]+)                                Hexadecimal literal prefixed with '0x'
+          |                                                  or
+          (?<dec>(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?))     Decimal literal with no prefix.
+        )
+        (?<type>u?y|u?s|u?l|u|n|d)?                          Capture type suffix(es) if found.
+        (?<multiplier>kb|mb|gb|tb|pb)?                       Capture multiplier suffix if found.
+        $                                                    End capture at end of string.
+
+
+    - Example matches:
+
+        | <full match> | <sign> | <bin>   | <hex>    | <dec>  | <type> | <multiplier> |
+        |--------------|--------|---------|----------|--------|--------|--------------|
+        | -.5          | -      |         |          | .5     |        |              |
+        | -100         | -      |         |          | 100    |        |              |
+        | 100u         |        |         |          | 100    | u      |              |
+        | +100D        | +      |         |          | 100    | d      |              |
+        | 100l         |        |         |          | 100    | l      |              |
+        | 100uL        |        |         |          | 100    | ul     |              |
+        | -100us       | -      |         |          | 100    | us     |              |
+        | -100uy       | -      |         |          | 100    | uy     |              |
+        | 100y         |        |         |          | 100    | y      |              |
+        | 1e2          |        |         |          | 1e2    |        |              |
+        | +1.e2        | +      |         |          | 1.e2   |        |              |
+        | 0x1e2        |        |         | 1e2      |        |        |              |
+        | -0x1e2L      | -      |         | 1e2      |        | l      |              |
+        | 482D         |        |         |          | 482    | d      |              |
+        | +482gb       | +      |         |          | 482    |        | gb           |
+        | 482ngb       |        |         |          | 482    | n      | gb           |
+        | 0x1e2lgb     |        |         | 1e2      |        | l      | gb           |
+        | +0b1011011   | +      | 1011011 |          |        |        |              |
+        | 0xFFFFs      |        |         | FFFF     |        | s      |              |
+        | -0xFFFFFFFF  | -      |         | FFFFFFFF |        |        |              |
+        | 0xFFFFFFFFu  |        |         | FFFFFFFF |        | u      |              |
+
+
+    - Detailed breakdown:
+
+  ^                       Beginning. Matches the beginning of the string.
+
+/ (?<sign>                Named capturing group. Creates a capturing group named 'sign'.
+|
+|   / [                   Character set. Match any character in the set.
+|   |
+|   |     +               Character. Matches a '+' character.
+|   |     -               Character. Matches a '-' character.
+|   |
+|   \ ]
+|
+\ )
+  ?                       Quantifier. Match between 0 and 1 of the preceeding token.
+
+/ (?:                     Non-capturing group. Groups multiple tokens together without creating a capture group.
+|
+|     0                   Character. Matches a '0' character.                                                    \ Alt #1 (bin)
+|     b                   Character. Matches a 'b' character. Case insensitive by default.                       |
+|                                                                                                                |
+|   / (?<bin>             Named capturing group. Creates a capturing group named bin.                            |
+|   |                                                                                                            |
+|   |   / [               Character set. Match any character in the set.                                         |
+|   |   |                                                                                                        |
+|   |   |     0           Character. Matches a '0' character.                                                    |
+|   |   |     1           Character. Matches a '1' character.                                                    |
+|   |   |                                                                                                        |
+|   |   \ ]                                                                                                      |
+|   |     +               Quantifier. Match 1 or more of the preceeding token.                                   |
+|   |                                                                                                            |
+|   \ )                                                                                                          /
+|
+|     |                   Alternation. Acts like a boolean OR. Matches the expression before or after the |.
+|
+|     0                   Character. Matches a '0' character.                                                    \ Alt #2 (hex)
+|     x                   Character. Matches a 'x' character. Case insensitive by default.                       |
+|                                                                                                                |
+|   / (?<hex>             Named capturing group. Creates a capturing group named hex.                            |
+|   |                                                                                                            |
+|   |   / [               Character set. Match any character in the set.                                         |
+|   |   |                                                                                                        |
+|   |   |     0-9         Range. Matches a character in the range '0' to '9'.                                    |
+|   |   |     a-f         Range. Matches a character in the range 'a' to 'f'. Case insensitive by default.       |
+|   |   |                                                                                                        |
+|   |   \ ]                                                                                                      |
+|   |     +               Quantifier. Match 1 or more of the preceeding token.                                   |
+|   |                                                                                                            |
+|   \ )                                                                                                          /
+|
+|     |                   Alternation. Acts like a boolean OR. Matches the expression before or after the |.
+|
+|   / (?<dec>             Named capturing group. Creates a capturing group named dec.                            \ Alt #3 (dec)
+|   |                                                                                                            |
+|   |   / (?:             Non-capturing group. Groups multiple tokens together without creating a capture group. |
+|   |   |                                                                                                        |
+|   |   |     \d          Digit. Matches any digit character (0-9).                                              |   \ Sub-Alt #1
+|   |   |     +           Quantifier. Match 1 or more of the preceeding token.                                   |   |
+|   |   |                                                                                                        |   |
+|   |   |   / (?:         Non-capturing group. Groups multiple tokens together without creating a capture group. |   |
+|   |   |   |                                                                                                    |   |
+|   |   |   |     \.      Escaped character. Matches a '.' character.                                            |   |
+|   |   |   |     \d      Digit. Matches any digit character (0-9).                                              |   |
+|   |   |   |     *       Quantifier. Match 0 or more of the preceeding token.                                   |   |
+|   |   |   |                                                                                                    |   |
+|   |   |   \ )                                                                                                  |   |
+|   |   |     ?           Quantifier. Match between 0 and 1 of the preceeding token.                             |   /
+|   |   |                                                                                                        |
+|   |   |     |           Alternation. Acts like a boolean OR. Matches the expression before or after the |.     |
+|   |   |                                                                                                        |
+|   |   |     \.          Escaped character. Matches a '.' character.                                            |   \ Sub-Alt #2
+|   |   |     \d          Digit. Matches any digit character (0-9).                                              |   |
+|   |   |     +           Quantifier. Match 1 or more of the preceeding token.                                   |   /
+|   |   |                                                                                                        |
+|   |   \ )                                                                                                      |
+|   |                                                                                                            |
+|   |   / (?:             Non-capturing group. Groups multiple tokens together without creating a capture group. |
+|   |   |                                                                                                        |
+|   |   |     e           Character. Matches a 'x' character. Case insensitive by default.                       |
+|   |   |                                                                                                        |
+|   |   |   / [           Character set. Match any character in the set.                                         |
+|   |   |   |                                                                                                    |
+|   |   |   |     +       Character. Matches a '+' character.                                                    |
+|   |   |   |     -       Character. Matches a '-' character.                                                    |
+|   |   |   |                                                                                                    |
+|   |   |   \ ]                                                                                                  |
+|   |   |     ?           Quantifier. Match between 0 and 1 of the preceeding token.                             |
+|   |   |                                                                                                        |
+|   |   |     \d          Digit. Matches any digit character (0-9).                                              |
+|   |   |     +           Quantifier. Match 1 or more of the preceeding token.                                   |
+|   |   |                                                                                                        |
+|   |   \ )                                                                                                      |
+|   |     ?               Quantifier. Match between 0 and 1 of the preceeding token.                             |
+|   |                                                                                                            |
+|   \ )                                                                                                          /
+|
+\ )
+
+/ (?<type>                Named capturing group. Creates a capturing group named 'type'.
+|
+|     u                   Character. Matches a 'u' character. Case insensitive by default.                       \ Alt #1
+|     ?                   Quantifier. Match between 0 and 1 of the preceeding token.                             |
+|                                                                                                                |
+|     y                   Character. Matches a 'y' character. Case insensitive by default.                       /
+|
+|     |                   Alternation. Acts like a boolean OR. Matches the expression before or after the |.
+|
+|     u                   Character. Matches a 'u' character. Case insensitive by default.                       \ Alt #2
+|     ?                   Quantifier. Match between 0 and 1 of the preceeding token.                             |
+|                                                                                                                |
+|     s                   Character. Matches a 's' character. Case insensitive by default.                       /
+|
+|     |                   Alternation. Acts like a boolean OR. Matches the expression before or after the |.
+|
+|     u                   Character. Matches a 'u' character. Case insensitive by default.                       \ Alt #3
+|     ?                   Quantifier. Match between 0 and 1 of the preceeding token.                             |
+|                                                                                                                |
+|     l                   Character. Matches a 'l' character. Case insensitive by default.                       /
+|
+|     |                   Alternation. Acts like a boolean OR. Matches the expression before or after the |.
+|
+|     u                   Character. Matches a 'u' character. Case insensitive by default.                       ) Alt #4
+|
+|     |                   Alternation. Acts like a boolean OR. Matches the expression before or after the |.
+|
+|     n                   Character. Matches a 'n' character. Case insensitive by default.                       ) Alt #5
+|
+|     |                   Alternation. Acts like a boolean OR. Matches the expression before or after the |.
+|
+|     d                   Character. Matches a 'd' character. Case insensitive by default.                       ) Alt #6
+|
+\ )
+  ?                       Quantifier. Match between 0 and 1 of the preceeding token.
+
+/ (?<multiplier>          Named capturing group. Creates a capturing group named 'multiplier'.
+|
+|     k                   Character. Matches a 'k' character. Case insensitive by default.                       \ Alt #1
+|     b                   Character. Matches a 'b' character. Case insensitive by default.                       /
+|
+|     |                   Alternation. Acts like a boolean OR. Matches the expression before or after the |.
+|
+|     m                   Character. Matches a 'm' character. Case insensitive by default.                       \ Alt #2
+|     b                   Character. Matches a 'b' character. Case insensitive by default.                       /
+|
+|     |                   Alternation. Acts like a boolean OR. Matches the expression before or after the |.
+|
+|     g                   Character. Matches a 'g' character. Case insensitive by default.                       \ Alt #3
+|     b                   Character. Matches a 'b' character. Case insensitive by default.                       /
+|
+|     |                   Alternation. Acts like a boolean OR. Matches the expression before or after the |.
+|
+|     t                   Character. Matches a 't' character. Case insensitive by default.                       \ Alt #4
+|     b                   Character. Matches a 'b' character. Case insensitive by default.                       /
+|
+|     |                   Alternation. Acts like a boolean OR. Matches the expression before or after the |.
+|
+|     p                   Character. Matches a 'p' character. Case insensitive by default.                       \ Alt #5
+|     b                   Character. Matches a 'b' character. Case insensitive by default.                       /
+|
+\ )
+  ?                       Quantifier. Match between 0 and 1 of the preceeding token.
+
+  $                       End. Matches the end of the string.
