@@ -1,0 +1,82 @@
+param
+(
+    [string] $regex = '^(?<sign>[+-])?(?:0b(?<bin>[01]+)|0x(?<hex>[0-9a-f]+)|(?<dec>(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?))(?<type>u?y|u?s|u?l|u|n|d)?(?<multiplier>kb|mb|gb|tb|pb)?$',
+    [int] $numOfTests = 50
+)
+
+# Define all valid tokens for random selection.
+[string[]] $sign = '+', '-'
+[string[]] $bPrefix = '0b', '0B'
+[string[]] $bit = '0', '1'
+[string[]] $hPrefix = '0x', '0X'
+[string[]] $hex = '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f', 'A', 'B', 'C', 'D', 'E', 'F'
+[string[]] $digit = '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'
+[string[]] $exp = 'e', 'E'
+[string[]] $type = 'uy', 'y', 'us', 's', 'ul', 'l', 'u', 'n', 'd'
+[string[]] $multiplier = 'kb', 'mb', 'gb', 'tb', 'pb'
+
+# Generate random numeric literals to test regex matching.
+[string[]] $goodLiterals = for ($i = 0; $i -lt $numOfTests; $i++)
+{
+    [string] $binary = (Get-Random $bPrefix) + (Get-Random $bit -Count (Get-Random -Minimum 1 -Maximum 4)) -replace '\s', ''
+    [string] $hexadecimal = (Get-Random $hPrefix) + (Get-Random $hex -Count (Get-Random -Minimum 1 -Maximum 4)) -replace '\s', ''
+
+    [bool] $r0 = $true, $false | Get-Random
+    [bool] $r1 = $true, $false | Get-Random
+    [bool] $r2 = ($true, $false | Get-Random) -or (-not ($r0 -and $r1))
+    [bool] $r3 = $true, $false | Get-Random
+    [bool] $r4 = $true, $false | Get-Random
+
+    [string] $decimal = "$(if ($r0) {(Get-Random $digit -Count (Get-Random -Minimum 1 -Maximum 3)) -as [string]}
+        $(if ($r1) {`".`" -as [string]})
+        $(if ($r2) {(Get-Random $digit -Count (Get-Random -Minimum 1 -Maximum 3)) -as [string]})
+        $(if ($r3) {((Get-Random $exp) -as [string]) +
+            $(if ($r4) {(Get-Random $sign) -as [string]}) +
+            [string]$((Get-Random $digit -Count (Get-Random -Minimum 1 -Maximum 3)) -as [string])
+        }))" -replace '\s', ''
+
+    [string] $out = "$(if ($true,$false | Get-Random) {(Get-Random $sign) -as [string]}
+        ($(Get-Random $binary, $hexadecimal, $decimal) -as [string])
+        $(if ($true,$false | Get-Random) {(Get-Random $type) -as [string]})
+        $(if ($true,$false | Get-Random) {(Get-Random $multiplier) -as [string]}))" -replace '\s', ''
+
+    $out
+}
+
+$pad = 15
+
+[string] $header = '| {0} | {1} | {2} | {3} | {4} | {5} | {6} |' -f @(
+    'Full Match'.PadRight($pad, ' ')
+    'Sign'.PadRight($pad, ' ')
+    'Bin'.PadRight($pad, ' ')
+    'Hex'.PadRight($pad, ' ')
+    'Dec'.PadRight($pad, ' ')
+    'Type'.PadRight($pad, ' ')
+    'Multiplier'.PadRight($pad, ' ')
+)
+
+Write-Host $header
+Write-Host ''.PadRight($header.Length, '-')
+
+foreach ($literal in $goodLiterals)
+{
+    if ($literal -match $regex)
+    {
+        Write-Host ('| {0} | {1} | {2} | {3} | {4} | {5} | {6} |' -f @(
+                try { ($Matches.0).PadRight($pad, ' ') } catch { ' '.PadRight($pad, ' ') }
+                try { ($Matches.sign).PadRight($pad, ' ') } catch { ' '.PadRight($pad, ' ') }
+                try { ($Matches.bin).PadRight($pad, ' ') } catch { ' '.PadRight($pad, ' ') }
+                try { ($Matches.hex).PadRight($pad, ' ') } catch { ' '.PadRight($pad, ' ') }
+                try { ($Matches.dec).PadRight($pad, ' ') } catch { ' '.PadRight($pad, ' ') }
+                try { ($Matches.type).PadRight($pad, ' ') } catch { ' '.PadRight($pad, ' ') }
+                try { ($Matches.multiplier).PadRight($pad, ' ') } catch { ' '.PadRight($pad, ' ') }
+            )
+        )
+    }
+    else
+    {
+        Write-Error "FAILED TO MATCH: $literal"
+    }
+}
+
+Read-Host "`nDone! Press Enter to close..."
