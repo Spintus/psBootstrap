@@ -1,0 +1,100 @@
+TOPIC
+    about_psBootstrap
+
+SHORT DESCRIPTION
+    A PowerShell module for auto-loading configuration files, modules, helper scripts, environment validators, preference variables, etc. into PowerShell sessions.
+
+LONG DESCRIPTION
+    psBootstrap is a PowerShell module which facilitates the performance of various initialization functions with minimal(ish) input from the calling script.
+
+    psBootstrap.psm1 exports three functions:
+
+        • Invoke-psBootstrap
+
+            Invoke-psBootstrap executes many helper functions which perform various initialization-related tasks. These include:
+
+                ○ Set-QuickEdit
+                    Disables PowerShell console's 'QuickEdit' mode[0].
+
+                ○ Test-CurrentPrincipal
+                    Verifies that the executing user has the permissions required for execution of a particular script.
+
+                ○ Get-IniContent
+                    Imports an ini file and parses it for sections, comments, and key/value pairs. Values are typed*.
+
+                    Defines an OrderedDictionary object corresponding to the file in caller's session (see comment-based help for Get-IniContent.).
+
+                ○ Test-IniContent
+                    Validates the structure/content of an OrderedDictionary object (obtained with Get-IniContent).
+
+                    Given an OrderedDictionary and a HashTable (see comment-based help for Test-IniContent.), ensures that the sections and keys represented by the HashTable are present in the OrderedDictionary.
+                    If the OrderedDictionary does not contain any of the sections or keys in the HashTable, an error is written.
+
+                ○ Import-Items
+                    Automatically loads helper scripts and modules listed in a given text file.
+
+                    Given a list and a directory path, import-module is called on every module file (.psm1/.psd1) listed which is found in a recursive search of the given directory.
+
+                    All listed scripts (.ps1) are dot-sourced. This can theoretically cause issues[1], but for realistic use cases the potential is negligible.
+
+                ○ Set-VerbosityLevel
+                    Sets various preference variables according to a bitmap. The reason this is done explicitly is that preference variable inheritance is totally broken[2] (as of Core 7.0.).
+
+        • Remove-psBootstrap
+
+            Remove-psBootstrap executes a few functions which make usage of a host shell after execution of a script less cumbersome:
+
+                ○ Attempts to remove logging module(s).
+                ○ Re-Enables QuickEdit mode in console.
+
+        • Resolve-Error
+
+            Resolve-Error is a helper function which is useful for getting meaningful stacktraces for otherwise-indecipherable error messages.
+            See comment-based help for usage examples.
+
+
+    Usage of this module is typically comprised of a call to Import-Module followed by passing of some parameters to the Invoke-psBootstrap function.
+
+    [0] https://stackoverflow.com/questions/30418886/how-and-why-does-quickedit-mode-in-command-prompt-freeze-applications
+    [1] https://becomelotr.wordpress.com/2017/02/13/expensive-dot-sourcing/
+    [2] https://github.com/PowerShell/PowerShell/issues/4568
+
+    * The parser which decides to which types values are assigned is a WIP, and some things such as the [BigInt] struct are not implemented.
+
+EXAMPLES
+>   Import-Module '.\Dependencies\psBootstrap\psBootstrap.psd1'
+>>
+>>  $mandatorySettings = @{
+>>      Settings = @(
+>>          'scriptName'
+>>          'hostLevel'
+>>          'doDryRun'
+>>          'confirmPreference'
+>>      )
+>>  }
+>>
+>>  $PSDefaultParameterValues.Add(
+>>      @{
+>>          'Invoke-psBootstrap:ConfigFilePath'     = '.\config.ini'
+>>          'Invoke-psBootstrap:MandatorySettings'  = $mandatorySettings
+>>          'Invoke-psBootstrap:ImportList'         = @(Get-Content '.\Dependencies\psImports.txt')
+>>          'Invoke-psBootstrap:ImportPath'         = '.\Dependencies\psImports'
+>>          'Invoke-psBootstrap:EnforceRole'        = 'Administrator'
+>>          'Invoke-psBootstrap:NoDisableQuickEdit' = $false
+>>          'Invoke-psBootstrap:BootstrapLogFile'   = '.\Logs\LastBootstrap.log'
+>>          'Invoke-psBootstrap:DebugBootstrap'     = $false
+>>      }
+>>  )
+>>
+>>  Invoke-psBootstrap
+
+The call to Invoke-psBootstrap uses the default parameters added. This will automatically call every single initialization function available to Invoke-psBootstrap.
+See functions' comment-based help for details of how and why these are implemented.
+
+KEYWORDS
+    BI IDF Bootstrap Init Initialize Engine Config Setup
+
+SEE ALSO
+    [0] https://stackoverflow.com/questions/30418886/how-and-why-does-quickedit-mode-in-command-prompt-freeze-applications
+    [1] https://becomelotr.wordpress.com/2017/02/13/expensive-dot-sourcing/
+    [2] https://github.com/PowerShell/PowerShell/issues/4568
